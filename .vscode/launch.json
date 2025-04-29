@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "GEDCOM Processor",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/gedcom_processor.py",
+            "args": ["ThraneJacobsen/ThraneJacobsen.ged", "--format", "word"],
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "cwd": "${workspaceFolder}",
+            "justMyCode": true
+        }
+    ]
+}
