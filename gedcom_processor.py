@@ -123,7 +123,6 @@ def main():
 
     print(f"Processing GEDCOM file: {args.gedcom_file}")
     processor = GedcomProcessor(args.gedcom_file)
-    print(processor.individuals)
     
     print(f"Found {len(processor.individuals)} individuals")
     
