@@ -29,70 +29,118 @@ class GedcomProcessor:
         self.individuals: Dict[str, Individual] = {}
         self.person_numbers: Dict[str, int] = {}
         self.current_number = 1
-        self._parse_gedcom(gedcom_file)
     
     def _parse_gedcom(self, gedcom_file: str):
+        gedcom_text = open(gedcom_file, 'r', encoding='utf-8').read()
+
+        # Stage 1: Read individuals
+        self.individuals = self.read_individuals(gedcom_text)
+
+        # Stage 2: Read family relations
+        self._read_family_relations(gedcom_file)
+
+    def read_individuals(self, gedcom_text: str) -> dict:
+        individuals_data = {}
+
         current_indi = None
         current_event = None
-        current_family = None
-        child_id = None
+
+        for line in gedcom_text.splitlines():
+            if not line.strip():
+                continue
+            
+            parts = line.strip().split(' ', 2)
+            if len(parts) < 2:
+                continue
+
+            try:
+                level = int(parts[0])
+            except ValueError:
+                continue
+            
+            tag_or_id = parts[1]
+            remaining = parts[2] if len(parts) > 2 else ""
+
+            # Handle INDI records
+            if level == 0:
+                if remaining == "INDI":
+                    current_indi = tag_or_id
+                    individuals_data[current_indi] = {"name": "", "birth_date": "", "death_date": ""}
+                    current_event = None
+                else:
+                    current_indi = None
+                    current_event = None
+
+            # Process individual data
+            elif current_indi and level == 1:
+                if tag_or_id == "NAME":
+                    individuals_data[current_indi]["name"] = remaining.replace('/', '').strip()
+                elif tag_or_id in ["BIRT", "DEAT"]:
+                    current_event = tag_or_id
+                else:
+                    current_event = None
+            elif current_indi and level == 2:
+                if tag_or_id == "DATE" and current_event:
+                    if current_event == "BIRT":
+                        individuals_data[current_indi]["birth_date"] = remaining
+                    elif current_event == "DEAT":
+                        individuals_data[current_indi]["death_date"] = remaining
+             
+        individuals: Dict[str, Individual] = {}
+
+        for indi_id, data in individuals_data.items():
+            individual = Individual(indi_id)
+            individual.name = data["name"]
+            individual.birth_date = data["birth_date"]
+            individual.death_date = data["death_date"]
+            individuals[indi_id] = individual
         
+        return individuals
+
+    def _read_family_relations(self, gedcom_file: str):
+        families_data = {}
         with open(gedcom_file, 'r', encoding='utf-8') as f:
+            current_family = None
+
             for line in f:
                 parts = line.strip().split(' ', 2)
                 if len(parts) < 2:
                     continue
-                    
-                level = int(parts[0])
+
+                try:
+                    level = int(parts[0])
+                except ValueError:
+                    continue
+
                 tag_or_id = parts[1]
                 remaining = parts[2] if len(parts) > 2 else ""
-                
-                # Handle INDI records
-                if level == 0:
-                    if remaining == "INDI":
-                        # Format: 0 @ID@ INDI
-                        current_indi = Individual(tag_or_id)
-                        self.individuals[tag_or_id] = current_indi
-                        current_event = None
-                    elif remaining == "FAM":
-                        # Format: 0 @ID@ FAM
-                        current_indi = None
-                        current_event = None
-                        current_family = tag_or_id
-                    else:
-                        current_indi = None
-                        current_event = None
-                        current_family = None
-                
-                elif current_indi and level == 1:
-                    if tag_or_id == "NAME":
-                        current_indi.name = remaining.replace('/', '').strip()
-                    elif tag_or_id in ["BIRT", "DEAT"]:
-                        current_event = tag_or_id
-                    elif tag_or_id == "FAMC":
-                        # Child in family
-                        pass
-                
-                elif current_indi and level == 2:
-                    if tag_or_id == "DATE" and current_event:
-                        if current_event == "BIRT":
-                            current_indi.birth_date = remaining
-                        elif current_event == "DEAT":
-                            current_indi.death_date = remaining
-                
+
+                # Handle FAM records
+                if level == 0 and remaining == "FAM":
+                    current_family = tag_or_id
+                    families_data[current_family] = {"husband": None, "wife": None, "children": []}
+                elif level == 0:
+                    current_family = None
+
+                # Process family data
                 elif current_family and level == 1:
-                    if tag_or_id == "CHIL":
-                        child_id = remaining
-                    elif tag_or_id == "HUSB" and child_id:
-                        # Found father
-                        father_id = remaining
-                        if child_id in self.individuals:
-                            self.individuals[child_id].father_id = father_id
-                    elif tag_or_id == "WIFE" and child_id:
-                        # Found mother
-                        mother_id = remaining
-                        if child_id in self.individuals:
-                            self.individuals[child_id].mother_id = mother_id
+                    if tag_or_id == "HUSB":
+                        families_data[current_family]["husband"] = remaining
+                    elif tag_or_id == "WIFE":
+                        families_data[current_family]["wife"] = remaining
+                    elif tag_or_id == "CHIL":
+                        families_data[current_family]["children"].append(remaining)
+
+        # Update family relations
+        for family_id, data in families_data.items():
+            husband_id = data["husband"]
+            wife_id = data["wife"]
+            for child_id in data["children"]:
+                if child_id in self.individuals:
+                    if husband_id:
+                        self.individuals[child_id].father_id = husband_id
+                    if wife_id:
+                        self.individuals[child_id].mother_id = wife_id
 
     def get_person_info(self, person: Individual) -> str:
         if person.id not in self.person_numbers:
@@ -123,6 +171,7 @@ def main():
 
     print(f"Processing GEDCOM file: {args.gedcom_file}")
     processor = GedcomProcessor(args.gedcom_file)
+    processor._parse_gedcom(args.gedcom_file)
     
     print(f"Found {len(processor.individuals)} individuals")
     
