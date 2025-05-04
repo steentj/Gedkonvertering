@@ -1,4 +1,5 @@
 from markdown_generator import MarkdownGenerator
+from word_document_generator import WordDocumentGenerator
 
 class TreeProcessor:
     def __init__(self, gedcom_processor):
