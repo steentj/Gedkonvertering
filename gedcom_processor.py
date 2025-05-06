@@ -173,8 +173,12 @@ def main():
     
     print(f"Found {len(processor.individuals)} individuals")
     
-    # Find a root person (first person in the file)
-    root_person = next(iter(processor.individuals.values())) if processor.individuals else None
+    # Find a root person (individual named 'steen thrane jacobsen')
+    root_person = next((person for person in processor.individuals.values() if person.name.lower() == "steen thrane jacobsen"), None)
+
+    if not root_person:
+        # Default to the first person in the file if 'steen thrane jacobsen' is not found
+        root_person = next(iter(processor.individuals.values())) if processor.individuals else None
     
     if root_person:
         from tree_processor import TreeProcessor  # Local import to avoid circular dependency
